@@ -1,0 +1,9 @@
+# Optional, bonus-only (Exercise 3.4). NOT needed for the core lab or tests.
+# On Windows install to a SHORT path to avoid the 260-char path limit:
+#   pip install --target C:\b34 -r bonus/requirements-bonus.txt
+#   (then run with PYTHONPATH=C:\b34)
+ragas==0.4.3
+langchain-community==0.3.31
+langchain-core<1.0
+langchain<1.0
+langchain-openai<1.0

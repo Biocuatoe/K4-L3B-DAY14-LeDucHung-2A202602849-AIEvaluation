@@ -46,6 +46,16 @@ pytest tests/ -v                                         # baseline: 42 tests co
 cp .env.example .env                                     # điền OPENAI_API_KEY (chỉ cần cho Part 3)
 ```
 
+`domain_assistant.py` chọn provider qua biến `LLM_PROVIDER` (`openai` mặc định, hoặc `groq` với `GROQ_API_KEY` / `GROQ_MODEL`); xem các biến mẫu trong `.env.example`. Không commit `.env`.
+
+Chạy benchmark thật (cần API key) và đánh giá offline:
+
+```bash
+python validate_golden_dataset.py     # kiểm tra golden dataset
+python domain_assistant.py            # sinh artifacts/actual_answers.json
+python evaluate_answers.py            # sinh artifacts/benchmark_results.json (không cần API key)
+```
+
 Chi tiết hướng dẫn theo hệ điều hành và xử lý lỗi: xem [`guide_lab.md`](guide_lab.md).
 
 ---
@@ -111,6 +121,8 @@ data/technology_store/*.md
 ├── evaluate_answers.py          # adapter artifact → evaluation core
 ├── validate_golden_dataset.py   # script kiểm tra schema và provenance dataset
 ├── golden_dataset.json          # form 20 QA để học viên điền
+├── bonus/                       # script bonus 3.4 (RAGAS) và 3.5 (rerank demo)
+├── docs/FINAL_SUBMISSION_CHECKLIST.md  # checklist nộp bài
 ├── data/technology_store/       # corpus tài liệu nguồn của OrbitTech Store
 ├── tests/                       # bộ unit tests kiểm tra evaluation core
 ├── requirements.txt
@@ -118,6 +130,26 @@ data/technology_store/*.md
 ```
 
 Khi chạy benchmark, các script sẽ tạo thư mục `artifacts/` chứa `actual_answers.json` và `benchmark_results.json` để phục vụ phân tích.
+
+### Kết quả đã xác minh của bài nộp này
+
+| Mục | Giá trị |
+|---|---|
+| Provider / model sinh answers | `groq` / `openai/gpt-oss-120b` (`top_k` = 5, `corpus_id` = `orbittech-customer-support-v1`) |
+| `pytest tests/ -v` | 48 passed, 0 skipped (41 test bắt buộc + 1 test reranking bonus + 6 test bổ sung trong `tests/test_rerank_bonus.py`) |
+| `python validate_golden_dataset.py` | PASS (20 QA: 5 easy + 7 medium + 5 hard + 3 adversarial; 10/10 tài liệu) |
+| `artifacts/actual_answers.json`, `artifacts/benchmark_results.json` | 20/20 cases, đủ điểm (pass rate 20.0%) |
+| Bonus 3.5 | `rerank_by_overlap()` + `python bonus/exercise_3_5_rerank_demo.py` → `artifacts/bonus_ex35_rerank.json` |
+| Bonus 3.4 | **Một phần**: `artifacts/bonus_ex34_ragas.json` có 27/60 điểm RAGAS thật, 33/60 là `null` (hết quota API). DeepEval chưa chạy. |
+
+Để chấm nốt 33 điểm RAGAS còn thiếu khi có quota API (tuỳ chọn, chỉ bonus):
+
+```bash
+pip install --target <short_dir> -r bonus/requirements-bonus.txt
+PYTHONPATH=<short_dir> python bonus/exercise_3_4_ragas_compare.py --resume   # PowerShell: $env:PYTHONPATH="<short_dir>"
+```
+
+Checklist nộp bài chi tiết: [`docs/FINAL_SUBMISSION_CHECKLIST.md`](docs/FINAL_SUBMISSION_CHECKLIST.md).
 
 ---
 
