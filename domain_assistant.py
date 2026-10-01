@@ -242,28 +242,66 @@ class TextGenerator(Protocol):
     def generate(self, prompt: str) -> str: ...
 
 
-class OpenAIGenerator:
+class ProviderAgnosticGenerator:
     def __init__(self, max_output_tokens: int = 300) -> None:
-        api_key = os.getenv("OPENAI_API_KEY", "").strip()
-        self.model = os.getenv("OPENAI_MODEL", "").strip()
-        if not api_key:
-            raise RuntimeError("OPENAI_API_KEY is missing from .env")
-        if not self.model:
-            raise RuntimeError("OPENAI_MODEL is missing from .env")
-        self.client = OpenAI(api_key=api_key)
+        provider = os.getenv("LLM_PROVIDER", "openai").strip().lower()
         self.max_output_tokens = max_output_tokens
 
+        # Read API key based on provider
+        if provider == "groq":
+            api_key = os.getenv("GROQ_API_KEY", "").strip()
+            if not api_key:
+                raise RuntimeError("GROQ_API_KEY is missing from .env")
+        elif provider == "openai":
+            api_key = os.getenv("OPENAI_API_KEY", "").strip()
+            if not api_key:
+                raise RuntimeError("OPENAI_API_KEY is missing from .env")
+        else:
+            raise RuntimeError(f"Unsupported LLM_PROVIDER: {provider!r}. Use 'openai' or 'groq'.")
+
+        # Read model: prefer provider-specific model, fall back to OPENAI_MODEL
+        if provider == "groq":
+            self.model = os.getenv("GROQ_MODEL", "").strip()
+            if not self.model:
+                self.model = os.getenv("OPENAI_MODEL", "").strip()
+        else:
+            self.model = os.getenv("OPENAI_MODEL", "").strip()
+
+        if not self.model:
+            raise RuntimeError("OPENAI_MODEL is missing from .env")
+
+        # Construct client
+        if provider == "groq":
+            self.client = OpenAI(
+                api_key=api_key,
+                base_url="https://api.groq.com/openai/v1"
+            )
+        else:
+            self.client = OpenAI(api_key=api_key)
+
     def generate(self, prompt: str) -> str:
-        response = self.client.responses.create(
-            model=self.model,
-            input=prompt,
-            temperature=0,
-            max_output_tokens=self.max_output_tokens,
-        )
-        answer = response.output_text.strip()
+        provider = os.getenv("LLM_PROVIDER", "openai").strip().lower()
+        kwargs = {
+            "model": self.model,
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0,
+        }
+        # Groq uses max_tokens, OpenAI Responses API uses max_output_tokens
+        # But we're using chat.completions for both now
+        if provider == "groq":
+            kwargs["max_tokens"] = 1500  # Groq needs more tokens; model may produce long reasoning
+        else:
+            kwargs["max_tokens"] = self.max_output_tokens
+
+        response = self.client.chat.completions.create(**kwargs)
+        answer = response.choices[0].message.content.strip()
         if not answer:
-            raise RuntimeError("OpenAI returned an empty answer")
+            raise RuntimeError(f"{provider.title()} returned an empty answer")
         return answer
+
+
+# Keep old name as alias for backward compatibility
+OpenAIGenerator = ProviderAgnosticGenerator
 
 
 @dataclass(frozen=True)
